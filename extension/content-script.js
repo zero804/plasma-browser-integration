@@ -272,7 +272,19 @@ addCallback("mpris", "setFullscreen", (message) => {
 });
 
 addCallback("mpris", "setPosition", function (message) {
-    if (activePlayer) {
+    if (playerCallbacks.includes("seekto")) {
+        executeScript(`
+            function() {
+                try {
+                    ${mediaSessionsClassName}.executeCallback("seekto", {
+                        seekTime: ${message.position}
+                    });
+                } catch (e) {
+                    console.warn("Exception executing 'seekto' media sessions callback", e);
+                }
+            }
+        `);
+    } else if (activePlayer) {
         activePlayer.currentTime = message.position;
     }
 });
@@ -714,11 +726,9 @@ function loadMediaSessionsShim() {
                         window.dispatchEvent(event);
                     };
 
-                    this.executeCallback = function (action) {
-                        let details = {
-                            action: action
-                            // for seekforward, seekbackward, seekto there's additional information one would need to add
-                        };
+                    this.executeCallback = function (action, args) {
+                        let details = args || {};
+                        details.action = action;
                         this.callbacks[action](details);
                     };
 

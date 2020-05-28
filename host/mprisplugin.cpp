@@ -340,7 +340,7 @@ bool MPrisPlugin::canPlay() const
 bool MPrisPlugin::canSeek() const
 {
     // TODO use player.seekable for determining whether we can seek?
-    return m_length > 0;
+    return m_length > 0 || m_canSeekTo;
 }
 
 qreal MPrisPlugin::volume() const
@@ -580,6 +580,12 @@ void MPrisPlugin::processCallbacks(const QJsonArray &data)
     if (m_canGoPrevious != canGoPrevious) {
         m_canGoPrevious = canGoPrevious;
         emitPropertyChange(m_player, "CanGoPrevious");
+    }
+
+    const bool oldCanSeek = canSeek();
+    m_canSeekTo = data.contains(QLatin1String("seekto"));
+    if (oldCanSeek != canSeek()) {
+        emitPropertyChange(m_player, "CanSeek");
     }
 }
 
