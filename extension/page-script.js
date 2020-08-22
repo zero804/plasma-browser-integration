@@ -2,7 +2,7 @@
     let purposeTransferObject = null;
     let mprisTransferObject = null;
     let eventCallback = function(e) {
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         const args = e.detail;
         console.warn("PS", e.detail);
         const action = args.action;
