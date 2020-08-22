@@ -49,9 +49,15 @@ function initPageScript(cb) {
     element.parentNode.removeChild(element);
 }
 
-function executePageAction(data) {
-    console.warn("CS", data);
-    window.dispatchEvent(new CustomEvent('pbiEvent', {detail: data}));
+function executePageAction(args) {
+    console.warn("CS", args);
+    // The page script injection and communication mechanism
+    // was inspired by https://github.com/x0a/uBO-YouTube
+    if (IS_FIREFOX) {
+        args = cloneInto(args, window);
+    }
+
+    window.dispatchEvent(new CustomEvent('pbiEvent', {detail: args}));
 }
 
 chrome.runtime.onMessage.addListener(function (message, sender) {
