@@ -35,14 +35,14 @@ function addCallback(subsystem, action, callback)
 }
 
 function initPageScript(cb) {
-	let pageScriptInitilalized = function() {
-		window.removeEventListener("pbiInited", pageScriptInitilalized);
-		cb();
-	}
-	window.addEventListener("pbiInited", pageScriptInitilalized, {"once": true});
-	
-	var element = document.createElement('script');
-	element.src = chrome.runtime.getURL("page-script.js");
+    let pageScriptInitilalized = function() {
+        window.removeEventListener("pbiInited", pageScriptInitilalized);
+        cb();
+    }
+    window.addEventListener("pbiInited", pageScriptInitilalized, {"once": true});
+
+    var element = document.createElement('script');
+    element.src = chrome.runtime.getURL("page-script.js");
     (document.body || document.head || document.documentElement).appendChild(element);
     // We need to remove the script tag after inserting or else websites relying on the order of items in
     // document.getElementsByTagName("script") will break (looking at you, Google Hangouts)
@@ -50,8 +50,8 @@ function initPageScript(cb) {
 }
 
 function executePageAction(data) {
-	console.warn("CS", data);
-	window.dispatchEvent(new CustomEvent('pbiEvent', {detail: data}));
+    console.warn("CS", data);
+    window.dispatchEvent(new CustomEvent('pbiEvent', {detail: data}));
 }
 
 chrome.runtime.onMessage.addListener(function (message, sender) {
@@ -70,44 +70,44 @@ chrome.runtime.onMessage.addListener(function (message, sender) {
 });
 
 initPageScript(() => {
-	SettingsUtils.get().then((items) => {
-		if (items.breezeScrollBars.enabled) {
-			loadBreezeScrollBars();
-		}
+    SettingsUtils.get().then((items) => {
+        if (items.breezeScrollBars.enabled) {
+            loadBreezeScrollBars();
+        }
 
-		const mpris = items.mpris;
-		if (mpris.enabled) {
-			const origin = window.location.origin;
+        const mpris = items.mpris;
+        if (mpris.enabled) {
+            const origin = window.location.origin;
 
-			const websiteSettings = mpris.websiteSettings || {};
+            const websiteSettings = mpris.websiteSettings || {};
 
-			let mprisAllowed = true;
-			if (typeof MPRIS_WEBSITE_SETTINGS[origin] === "boolean") {
-				mprisAllowed = MPRIS_WEBSITE_SETTINGS[origin];
-			}
-			if (typeof websiteSettings[origin] === "boolean") {
-				mprisAllowed = websiteSettings[origin];
-			}
+            let mprisAllowed = true;
+            if (typeof MPRIS_WEBSITE_SETTINGS[origin] === "boolean") {
+                mprisAllowed = MPRIS_WEBSITE_SETTINGS[origin];
+            }
+            if (typeof websiteSettings[origin] === "boolean") {
+                mprisAllowed = websiteSettings[origin];
+            }
 
-			if (mprisAllowed) {
-				loadMpris();
-				if (items.mprisMediaSessions.enabled) {
-					loadMediaSessionsShim();
-				}
-			}
-		}
+            if (mprisAllowed) {
+                loadMpris();
+                if (items.mprisMediaSessions.enabled) {
+                    loadMediaSessionsShim();
+                }
+            }
+        }
 
-		if (items.purpose.enabled) {
-			sendMessage("settings", "getSubsystemStatus").then((status) => {
-				if (status && status.purpose) {
-					loadPurpose();
-				}
-			}, (err) => {
-				// No warning, can also happen when port isn't connected for unsupported OS
-				console.log("Failed to get subsystem status for purpose", err);
-			});
-		}	
-	});
+        if (items.purpose.enabled) {
+            sendMessage("settings", "getSubsystemStatus").then((status) => {
+                if (status && status.purpose) {
+                    loadPurpose();
+                }
+            }, (err) => {
+                // No warning, can also happen when port isn't connected for unsupported OS
+                console.log("Failed to get subsystem status for purpose", err);
+            });
+        }
+    });
 });
 
 // BREEZE SCROLL BARS
@@ -175,10 +175,6 @@ html::-webkit-scrollbar-corner {
 // ------------------------------------------------------------------------
 //
 
-// also give the function a "random" name as we have to have it in global scope to be able
-// to invoke callbacks from outside, UUID might start with a number, so prepend something
-const mediaSessionsClassName = "f" + generateGuid().replace(/-/g, "");
-
 var activePlayer;
 // When a player has no duration yet, we'll wait for it becoming known
 // to determine whether to ignore it (short sound) or make it active
@@ -217,7 +213,7 @@ addCallback("mpris", "playPause", function () {
 addCallback("mpris", "stop", function () {
     // When available, use the "stop" media sessions action
     if (playerCallbacks.indexOf("stop") > -1) {
-        executePageAction({"action": "mpris", "mediaSessionsClassName": mediaSessionsClassName, "mprisCallbackName": "stop"});
+        executePageAction({"action": "mpris", "mprisCallbackName": "stop"});
         return;
     }
 
@@ -240,13 +236,13 @@ addCallback("mpris", "stop", function () {
 
 addCallback("mpris", "next", function () {
     if (playerCallbacks.indexOf("nexttrack") > -1) {
-		executePageAction({"action": "mpris", "mediaSessionsClassName": mediaSessionsClassName, "mprisCallbackName": "nexttrack"});
+        executePageAction({"action": "mpris", "mprisCallbackName": "nexttrack"});
     }
 });
 
 addCallback("mpris", "previous", function () {
     if (playerCallbacks.indexOf("previoustrack") > -1) {
-		executePageAction({"action": "mpris", "mediaSessionsClassName": mediaSessionsClassName, "mprisCallbackName": "previoustrack"});
+        executePageAction({"action": "mpris", "mprisCallbackName": "previoustrack"});
     }
 });
 
@@ -516,7 +512,7 @@ function registerAllPlayers() {
 function playerPlay() {
     // if a media sessions callback is registered, it takes precedence over us manually messing with the player
     if (playerCallbacks.indexOf("play") > -1) {
-		executePageAction({"action": "mpris", "mediaSessionsClassName": mediaSessionsClassName, "mprisCallbackName": "play"});
+        executePageAction({"action": "mpris", "mprisCallbackName": "play"});
     } else if (activePlayer) {
         activePlayer.play();
     }
@@ -524,7 +520,7 @@ function playerPlay() {
 
 function playerPause() {
     if (playerCallbacks.indexOf("pause") > -1) {
-		executePageAction({"action": "mpris", "mediaSessionsClassName": mediaSessionsClassName, "mprisCallbackName": "pause"});
+        executePageAction({"action": "mpris", "mprisCallbackName": "pause"});
     } else if (activePlayer) {
         activePlayer.pause();
     }
@@ -678,15 +674,13 @@ function loadMediaSessionsShim() {
             }
         });
 
-        executePageAction({"action": "mediaSessionsRegister", "mediaSessionsClassName": mediaSessionsClassName});
+        executePageAction({"action": "mediaSessionsRegister"});
     }
 }
 
 // PURPOSE / WEB SHARE API
 // ------------------------------------------------------------------------
 //
-const purposeTransferClassName = "p" + generateGuid().replace(/-/g, "");
-
 var purposeLoaded = false;
 function loadPurpose() {
     if (purposeLoaded) {
@@ -711,14 +705,14 @@ function loadPurpose() {
         }
 
         sendMessage("purpose", "share", payload).then((response) => {
-			executePageAction({"action": "purposeShare", "purposeTransferClassName": purposeTransferClassName});
+            executePageAction({"action": "purposeShare"});
         }, (err) => {
             // Deliberately not giving any more details about why it got rejected
-			executePageAction({"action": "purposeReject", "purposeTransferClassName": purposeTransferClassName});
+            executePageAction({"action": "purposeReject"});
         }).finally(() => {
-			executePageAction({"action": "purposeReset", "purposeTransferClassName": purposeTransferClassName});
+            executePageAction({"action": "purposeReset"});
         });;
     });
 
-    executePageAction({"action": "purposeRegister", "purposeTransferClassName": purposeTransferClassName});
+    executePageAction({"action": "purposeRegister"});
 }
