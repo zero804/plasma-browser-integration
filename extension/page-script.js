@@ -1,272 +1,275 @@
-(function pbiPageScript(args) {
-console.warn("PS", args);
-const action = args.action;
-if (action == "mediaSessionsRegister") {
-    MediaSessionsClassName_constructor = function() {
-        this.callbacks = {};
-        this.pendingCallbacksUpdate = 0;
-        this.metadata = null;
-        this.playbackState = "none";
+window.addEventListener("pbiEvent", function(e) {
+    e.stopPropagation();
+    const args = e.detail;
+    console.warn("PS", e.detail);
+    const action = args.action;
+    if (action == "mediaSessionsRegister") {
+        MediaSessionsClassName_constructor = function() {
+            this.callbacks = {};
+            this.pendingCallbacksUpdate = 0;
+            this.metadata = null;
+            this.playbackState = "none";
 
-        this.sendMessage = function(action, payload) {
-            let event = new CustomEvent("pbiMprisMessage", {
-                detail: {
-                    action: action,
-                    payload: payload
-                }
-            });
-            window.dispatchEvent(event);
-        };
-
-        this.executeCallback = function(action) {
-            let details = {
-                action: action
-                // for seekforward, seekbackward, seekto there's additional information one would need to add
-            };
-            this.callbacks[action](details);
-        };
-
-        this.setCallback = function(name, cb) {
-            const oldCallbacks = Object.keys(this.callbacks).sort();
-
-            if (cb) {
-                this.callbacks[name] = cb;
-            } else {
-                delete this.callbacks[name];
-            }
-
-            const newCallbacks = Object.keys(this.callbacks).sort();
-
-            if (oldCallbacks.toString() === newCallbacks.toString()) {
-                return;
-            }
-
-            if (this.pendingCallbacksUpdate) {
-                return;
-            }
-
-            this.pendingCallbacksUpdate = setTimeout(() => {
-                this.pendingCallbacksUpdate = 0;
-
-                // Make sure to send the current callbacks, not "newCallbacks" at the time of starting the timeout
-                const callbacks = Object.keys(this.callbacks);
-                this.sendMessage("callbacks", callbacks);
-            }, 0);
-        };
-
-        this.setMetadata = function(metadata) {
-            // MediaMetadata is not a regular Object so we cannot just JSON.stringify it
-            let newMetadata = {};
-
-            let dirty = (!metadata != !this.metadata);
-            if (metadata) {
-                const keys = Object.getOwnPropertyNames(Object.getPrototypeOf(metadata));
-
-                const oldMetadata = this.metadata || {};
-
-                keys.forEach((key) => {
-                    const value = metadata[key];
-                    if (!value || typeof value === "function") {
-                        return; // continue
-                    }
-
-                    // We only have Strings or the "artwork" Array, so a toString() comparison should suffice...
-                    dirty |= (value.toString() !== (oldMetadata[key] || "").toString());
-
-                    newMetadata[key] = value;
-                });
-            }
-
-            this.metadata = metadata;
-
-            if (dirty) {
-                this.sendMessage("metadata", newMetadata);
-            }
-        };
-
-        this.setPlaybackState = function(playbackState) {
-            if (this.playbackState === playbackState) {
-                return;
-            }
-
-            this.playbackState = playbackState;
-            this.sendMessage("playbackState", playbackState);
-        };
-    };
-
-    window[args.mediaSessionsClassName] = new MediaSessionsClassName_constructor();
-
-    if (!navigator.mediaSession) {
-        navigator.mediaSession = {};
-    }
-
-    var noop = function() {};
-
-    var oldSetActionHandler = navigator.mediaSession.setActionHandler || noop;
-    navigator.mediaSession.setActionHandler = function(name, cb) {
-        window[args.mediaSessionsClassName].setCallback(name, cb);
-
-        // Call the original native implementation
-        // "call()" is needed as the real setActionHandler is a class member
-        // and calling it directly is illegal as it lacks the context
-        // This may throw for unsupported actions but we registered the callback
-        // ourselves before
-        return oldSetActionHandler.call(navigator.mediaSession, name, cb);
-    };
-
-    Object.defineProperty(navigator.mediaSession, "metadata", {
-        get: () => window[args.mediaSessionsClassName].metadata,
-        set: (newValue) => {
-            window[data.mediaSessionsClassName].setMetadata(newValue);
-        }
-    });
-    Object.defineProperty(navigator.mediaSession, "playbackState", {
-        get: () => window[args.mediaSessionsClassName].playbackState,
-        set: (newValue) => {
-            window[data.mediaSessionsClassName].setPlaybackState(newValue);
-        }
-    });
-
-    if (!window.MediaMetadata) {
-        window.MediaMetadata = function(data) {
-            Object.assign(this, data);
-        };
-        window.MediaMetadata.prototype.title = "";
-        window.MediaMetadata.prototype.artist = "";
-        window.MediaMetadata.prototype.album = "";
-        window.MediaMetadata.prototype.artwork = [];
-    }
-} else if (action == "mpris") {
-    try {
-        window[args.mediaSessionsClassName].executeCallback(args.mprisCallbackName);
-    } catch (e) {
-        console.warn("Exception executing '" + args.mprisCallbackName + "' media sessions callback", e);
-    } 
-} else if (action == "purposeRegister") {
-    window[args.purposeTransferClassName] = function() {};
-    let transfer = window[args.purposeTransferClassName];
-    transfer.reset = () => {
-        transfer.pendingResolve = null;
-        transfer.pendingReject = null;
-    };
-    transfer.reset();
-
-    if (!navigator.canShare) {
-        navigator.canShare = (data) => {
-            if (!data) {
-                return false;
-            }
-
-            if (data.title === undefined && data.text === undefined && data.url === undefined) {
-                return false;
-            }
-
-            if (data.url) {
-                // check if URL is valid
-                try {
-                    new URL(data.url, document.location.href);
-                } catch (e) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-    }
-
-    if (!navigator.share) {
-        navigator.share = (data) => {
-            return new Promise((resolve, reject) => {
-                if (!navigator.canShare(data)) {
-                    return reject(new TypeError());
-                }
-
-                if (data.url) {
-                    // validity already checked in canShare, hence no catch
-                    data.url = new URL(data.url, document.location.href).toString();
-                }
-
-                if (!window.event || !window.event.isTrusted) {
-                    return reject(new DOMException("navigator.share can only be called in response to user interaction", "NotAllowedError"));
-                }
-
-                if (transfer.pendingResolve || transfer.pendingReject) {
-                    return reject(new DOMException("A share is already in progress", "AbortError"));
-                }
-
-                transfer.pendingResolve = resolve;
-                transfer.pendingReject = reject;
-
-                const event = new CustomEvent("pbiPurposeMessage", {
+            this.sendMessage = function(action, payload) {
+                let event = new CustomEvent("pbiMprisMessage", {
                     detail: {
-                        action: "share",
-                        payload: data
+                        action: action,
+                        payload: payload
                     }
                 });
                 window.dispatchEvent(event);
-            });
+            };
+
+            this.executeCallback = function(action) {
+                let details = {
+                    action: action
+                    // for seekforward, seekbackward, seekto there's additional information one would need to add
+                };
+                this.callbacks[action](details);
+            };
+
+            this.setCallback = function(name, cb) {
+                const oldCallbacks = Object.keys(this.callbacks).sort();
+
+                if (cb) {
+                    this.callbacks[name] = cb;
+                } else {
+                    delete this.callbacks[name];
+                }
+
+                const newCallbacks = Object.keys(this.callbacks).sort();
+
+                if (oldCallbacks.toString() === newCallbacks.toString()) {
+                    return;
+                }
+
+                if (this.pendingCallbacksUpdate) {
+                    return;
+                }
+
+                this.pendingCallbacksUpdate = setTimeout(() => {
+                    this.pendingCallbacksUpdate = 0;
+
+                    // Make sure to send the current callbacks, not "newCallbacks" at the time of starting the timeout
+                    const callbacks = Object.keys(this.callbacks);
+                    this.sendMessage("callbacks", callbacks);
+                }, 0);
+            };
+
+            this.setMetadata = function(metadata) {
+                // MediaMetadata is not a regular Object so we cannot just JSON.stringify it
+                let newMetadata = {};
+
+                let dirty = (!metadata != !this.metadata);
+                if (metadata) {
+                    const keys = Object.getOwnPropertyNames(Object.getPrototypeOf(metadata));
+
+                    const oldMetadata = this.metadata || {};
+
+                    keys.forEach((key) => {
+                        const value = metadata[key];
+                        if (!value || typeof value === "function") {
+                            return; // continue
+                        }
+
+                        // We only have Strings or the "artwork" Array, so a toString() comparison should suffice...
+                        dirty |= (value.toString() !== (oldMetadata[key] || "").toString());
+
+                        newMetadata[key] = value;
+                    });
+                }
+
+                this.metadata = metadata;
+
+                if (dirty) {
+                    this.sendMessage("metadata", newMetadata);
+                }
+            };
+
+            this.setPlaybackState = function(playbackState) {
+                if (this.playbackState === playbackState) {
+                    return;
+                }
+
+                this.playbackState = playbackState;
+                this.sendMessage("playbackState", playbackState);
+            };
         };
-    }
 
-    let addPlayerToDomEvadingAutoPlayBlocking = function(player) {
-        player.registerInDom = () => {
-            // Needs to be dataset so it's accessible from mutation observer on webpage
-            player.dataset.pbiPausedForDomRemoval = "true";
-            player.removeEventListener("play", player.registerInDom);
+        window[args.mediaSessionsClassName] = new MediaSessionsClassName_constructor();
 
-            // If it is already in DOM by the time it starts playing, we don't need to do anything
-            if (document.body && document.body.contains(player)) {
-                delete player.dataset.pbiPausedForDomRemoval;
-                player.removeEventListener("pause", player.replayAfterRemoval);
-            } else {
-                (document.head || document.documentElement).appendChild(player);
-                player.parentNode.removeChild(player);
+        if (!navigator.mediaSession) {
+            navigator.mediaSession = {};
+        }
+
+        var noop = function() {};
+
+        var oldSetActionHandler = navigator.mediaSession.setActionHandler || noop;
+        navigator.mediaSession.setActionHandler = function(name, cb) {
+            window[args.mediaSessionsClassName].setCallback(name, cb);
+
+            // Call the original native implementation
+            // "call()" is needed as the real setActionHandler is a class member
+            // and calling it directly is illegal as it lacks the context
+            // This may throw for unsupported actions but we registered the callback
+            // ourselves before
+            return oldSetActionHandler.call(navigator.mediaSession, name, cb);
+        };
+
+        Object.defineProperty(navigator.mediaSession, "metadata", {
+            get: () => window[args.mediaSessionsClassName].metadata,
+            set: (newValue) => {
+                window[args.mediaSessionsClassName].setMetadata(newValue);
             }
-        };
-
-        player.replayAfterRemoval = () => {
-            if (player.dataset.pbiPausedForDomRemoval === "true") {
-                delete player.dataset.pbiPausedForDomRemoval;
-                player.removeEventListener("pause", player.replyAfterRemoval);
-
-                player.play();
+        });
+        Object.defineProperty(navigator.mediaSession, "playbackState", {
+            get: () => window[args.mediaSessionsClassName].playbackState,
+            set: (newValue) => {
+                window[args.mediaSessionsClassName].setPlaybackState(newValue);
             }
+        });
+
+        if (!window.MediaMetadata) {
+            window.MediaMetadata = function(data) {
+                Object.assign(this, data);
+            };
+            window.MediaMetadata.prototype.title = "";
+            window.MediaMetadata.prototype.artist = "";
+            window.MediaMetadata.prototype.album = "";
+            window.MediaMetadata.prototype.artwork = [];
+        }
+    } else if (action == "mpris") {
+        try {
+            window[args.mediaSessionsClassName].executeCallback(args.mprisCallbackName);
+        } catch (e) {
+            console.warn("Exception executing '" + args.mprisCallbackName + "' media sessions callback", e);
+        }
+    } else if (action == "purposeRegister") {
+        window[args.purposeTransferClassName] = function() {};
+        let transfer = window[args.purposeTransferClassName];
+        transfer.reset = () => {
+            transfer.pendingResolve = null;
+            transfer.pendingReject = null;
         };
+        transfer.reset();
 
-        player.addEventListener("play", player.registerInDom);
-        player.addEventListener("pause", player.replayAfterRemoval);
-    }
+        if (!navigator.canShare) {
+            navigator.canShare = (data) => {
+                if (!data) {
+                    return false;
+                }
 
-    const oldCreateElement = Document.prototype.createElement;
-    Document.prototype.createElement = function() {
-        const createdTag = oldCreateElement.apply(this, arguments);
-        const tagName = arguments[0];
+                if (data.title === undefined && data.text === undefined && data.url === undefined) {
+                    return false;
+                }
 
-        if (typeof tagName === "string") {
-            if (tagName.toLowerCase() === "audio") {
-                const player = createdTag;
-                addPlayerToDomEvadingAutoPlayBlocking(player);
-            } else if (tagName.toLowerCase() === "video") {
-                (document.head || document.documentElement).appendChild(createdTag);
-                createdTag.parentNode.removeChild(createdTag);
+                if (data.url) {
+                    // check if URL is valid
+                    try {
+                        new URL(data.url, document.location.href);
+                    } catch (e) {
+                        return false;
+                    }
+                }
+
+                return true;
             }
         }
-        return createdTag;
-    };
 
-    var oldAudio = window.Audio;
-    window.Audio = function(...args) {
-        const player = new oldAudio(...args);
-        addPlayerToDomEvadingAutoPlayBlocking(player);
-        return player;
-    };
-} else if (action == "purposeShare") {
-    window[args.purposeTransferClassName].pendingResolve();
-} else if (action == "purposeReject") {
-    window[args.purposeTransferClassName].pendingReject(new DOMException("Share request aborted", "AbortError"));
-} else if (action == "purposeReset") {
-    window[args.purposeTransferClassName].reset();
-} else {
-    console.warn("Unknown page script action" + action, args);
-}
-})(document.currentScript.dataset);
+        if (!navigator.share) {
+            navigator.share = (data) => {
+                return new Promise((resolve, reject) => {
+                    if (!navigator.canShare(data)) {
+                        return reject(new TypeError());
+                    }
+
+                    if (data.url) {
+                        // validity already checked in canShare, hence no catch
+                        data.url = new URL(data.url, document.location.href).toString();
+                    }
+
+                    if (!window.event || !window.event.isTrusted) {
+                        return reject(new DOMException("navigator.share can only be called in response to user interaction", "NotAllowedError"));
+                    }
+
+                    if (transfer.pendingResolve || transfer.pendingReject) {
+                        return reject(new DOMException("A share is already in progress", "AbortError"));
+                    }
+
+                    transfer.pendingResolve = resolve;
+                    transfer.pendingReject = reject;
+
+                    const event = new CustomEvent("pbiPurposeMessage", {
+                        detail: {
+                            action: "share",
+                            payload: data
+                        }
+                    });
+                    window.dispatchEvent(event);
+                });
+            };
+        }
+
+        let addPlayerToDomEvadingAutoPlayBlocking = function(player) {
+            player.registerInDom = () => {
+                // Needs to be dataset so it's accessible from mutation observer on webpage
+                player.dataset.pbiPausedForDomRemoval = "true";
+                player.removeEventListener("play", player.registerInDom);
+
+                // If it is already in DOM by the time it starts playing, we don't need to do anything
+                if (document.body && document.body.contains(player)) {
+                    delete player.dataset.pbiPausedForDomRemoval;
+                    player.removeEventListener("pause", player.replayAfterRemoval);
+                } else {
+                    (document.head || document.documentElement).appendChild(player);
+                    player.parentNode.removeChild(player);
+                }
+            };
+
+            player.replayAfterRemoval = () => {
+                if (player.dataset.pbiPausedForDomRemoval === "true") {
+                    delete player.dataset.pbiPausedForDomRemoval;
+                    player.removeEventListener("pause", player.replyAfterRemoval);
+
+                    player.play();
+                }
+            };
+
+            player.addEventListener("play", player.registerInDom);
+            player.addEventListener("pause", player.replayAfterRemoval);
+        }
+
+        const oldCreateElement = Document.prototype.createElement;
+        Document.prototype.createElement = function() {
+            const createdTag = oldCreateElement.apply(this, arguments);
+            const tagName = arguments[0];
+
+            if (typeof tagName === "string") {
+                if (tagName.toLowerCase() === "audio") {
+                    const player = createdTag;
+                    addPlayerToDomEvadingAutoPlayBlocking(player);
+                } else if (tagName.toLowerCase() === "video") {
+                    (document.head || document.documentElement).appendChild(createdTag);
+                    createdTag.parentNode.removeChild(createdTag);
+                }
+            }
+            return createdTag;
+        };
+
+        var oldAudio = window.Audio;
+        window.Audio = function(...args) {
+            const player = new oldAudio(...args);
+            addPlayerToDomEvadingAutoPlayBlocking(player);
+            return player;
+        };
+    } else if (action == "purposeShare") {
+        window[args.purposeTransferClassName].pendingResolve();
+    } else if (action == "purposeReject") {
+        window[args.purposeTransferClassName].pendingReject(new DOMException("Share request aborted", "AbortError"));
+    } else if (action == "purposeReset") {
+        window[args.purposeTransferClassName].reset();
+    } else {
+        console.warn("Unknown page script action" + action, args);
+    }
+}, {"capture": true});
+window.dispatchEvent(new CustomEvent("pbiInited"));

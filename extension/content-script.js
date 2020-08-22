@@ -34,18 +34,24 @@ function addCallback(subsystem, action, callback)
     callbacks[subsystem][action] = callback;
 }
 
-function executePageAction(data) {
-	return;
-	console.warn("CS", data);
-    var element = document.createElement('script');
-	for(let key of Object.keys(data)) {
-	    element.dataset[key] = data[key];
+function initPageScript(cb) {
+	let pageScriptInitilalized = function() {
+		window.removeEventListener("pbiInited", pageScriptInitilalized);
+		cb();
 	}
+	window.addEventListener("pbiInited", pageScriptInitilalized, {"once": true});
+	
+	var element = document.createElement('script');
 	element.src = chrome.runtime.getURL("page-script.js");
     (document.body || document.head || document.documentElement).appendChild(element);
     // We need to remove the script tag after inserting or else websites relying on the order of items in
     // document.getElementsByTagName("script") will break (looking at you, Google Hangouts)
     element.parentNode.removeChild(element);
+}
+
+function executePageAction(data) {
+	console.warn("CS", data);
+	window.dispatchEvent(new CustomEvent('pbiEvent', {detail: data}));
 }
 
 chrome.runtime.onMessage.addListener(function (message, sender) {
@@ -63,43 +69,45 @@ chrome.runtime.onMessage.addListener(function (message, sender) {
     }
 });
 
-SettingsUtils.get().then((items) => {
-    if (items.breezeScrollBars.enabled) {
-        loadBreezeScrollBars();
-    }
+initPageScript(() => {
+	SettingsUtils.get().then((items) => {
+		if (items.breezeScrollBars.enabled) {
+			loadBreezeScrollBars();
+		}
 
-    const mpris = items.mpris;
-    if (mpris.enabled) {
-        const origin = window.location.origin;
+		const mpris = items.mpris;
+		if (mpris.enabled) {
+			const origin = window.location.origin;
 
-        const websiteSettings = mpris.websiteSettings || {};
+			const websiteSettings = mpris.websiteSettings || {};
 
-        let mprisAllowed = true;
-        if (typeof MPRIS_WEBSITE_SETTINGS[origin] === "boolean") {
-            mprisAllowed = MPRIS_WEBSITE_SETTINGS[origin];
-        }
-        if (typeof websiteSettings[origin] === "boolean") {
-            mprisAllowed = websiteSettings[origin];
-        }
+			let mprisAllowed = true;
+			if (typeof MPRIS_WEBSITE_SETTINGS[origin] === "boolean") {
+				mprisAllowed = MPRIS_WEBSITE_SETTINGS[origin];
+			}
+			if (typeof websiteSettings[origin] === "boolean") {
+				mprisAllowed = websiteSettings[origin];
+			}
 
-        if (mprisAllowed) {
-            loadMpris();
-            if (items.mprisMediaSessions.enabled) {
-                loadMediaSessionsShim();
-            }
-        }
-    }
+			if (mprisAllowed) {
+				loadMpris();
+				if (items.mprisMediaSessions.enabled) {
+					loadMediaSessionsShim();
+				}
+			}
+		}
 
-    if (items.purpose.enabled) {
-        sendMessage("settings", "getSubsystemStatus").then((status) => {
-            if (status && status.purpose) {
-                loadPurpose();
-            }
-        }, (err) => {
-            // No warning, can also happen when port isn't connected for unsupported OS
-            console.log("Failed to get subsystem status for purpose", err);
-        });
-    }
+		if (items.purpose.enabled) {
+			sendMessage("settings", "getSubsystemStatus").then((status) => {
+				if (status && status.purpose) {
+					loadPurpose();
+				}
+			}, (err) => {
+				// No warning, can also happen when port isn't connected for unsupported OS
+				console.log("Failed to get subsystem status for purpose", err);
+			});
+		}	
+	});
 });
 
 // BREEZE SCROLL BARS
