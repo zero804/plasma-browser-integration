@@ -6,14 +6,13 @@
         e.stopPropagation();
         const args = e.detail;
         console.warn("PS", e.detail);
-        const action = args.action;
-        if (action == "load") {
+        if (args.action == "load") {
             loaded = true;
-        } else if (action == "unload") {
+        } else if (args.action == "unload") {
             // TODO: Undo other operations
             if(loaded)
                 window.removeEventListener("pbiEvent", eventCallback, {"capture": true});
-        } else if (action == "mediaSessionsRegister") {
+        } else if (args.action == "mediaSessionsRegister") {
             MediaSessionsClassName_constructor = function() {
                 this.callbacks = {};
                 this.pendingCallbacksUpdate = 0;
@@ -148,13 +147,13 @@
                 window.MediaMetadata.prototype.album = "";
                 window.MediaMetadata.prototype.artwork = [];
             }
-        } else if (action == "mpris") {
+        } else if (args.action == "mpris") {
             try {
                 mprisTransferObject.executeCallback(args.mprisCallbackName);
             } catch (e) {
                 console.warn("Exception executing '" + args.mprisCallbackName + "' media sessions callback", e);
             }
-        } else if (action == "purposeRegister") {
+        } else if (args.action == "purposeRegister") {
             purposeTransferObject = function() {};
             purposeTransferObject.reset = () => {
                 purposeTransferObject.pendingResolve = null;
@@ -286,14 +285,14 @@
                 addPlayerToDomEvadingAutoPlayBlocking(player);
                 return player;
             };
-        } else if (action == "purposeShare") {
+        } else if (args.action == "purposeShare") {
             purposeTransferObject.pendingResolve();
-        } else if (action == "purposeReject") {
+        } else if (args.action == "purposeReject") {
             purposeTransferObject.pendingReject(new DOMException("Share request aborted", "AbortError"));
-        } else if (action == "purposeReset") {
+        } else if (args.action == "purposeReset") {
             purposeTransferObject.reset();
         } else {
-            console.warn("Unknown page script action" + action, args);
+            console.warn("Unknown page script action" + args.action, args);
         }
     };
     window.addEventListener("pbiEvent", eventCallback, {"capture": true});
