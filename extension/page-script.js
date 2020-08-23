@@ -1,12 +1,19 @@
-(function pbiPageScript() {
+(function() {
     let purposeTransferObject = null;
     let mprisTransferObject = null;
+    let loaded = false;
     let eventCallback = function(e) {
-        e.stopImmediatePropagation();
+        e.stopPropagation();
         const args = e.detail;
         console.warn("PS", e.detail);
         const action = args.action;
-        if (action == "mediaSessionsRegister") {
+        if (action == "load") {
+            loaded = true;
+        } else if (action == "unload") {
+            // TODO: Undo other operations
+            if(loaded)
+                window.removeEventListener("pbiEvent", eventCallback, {"capture": true});
+        } else if (action == "mediaSessionsRegister") {
             MediaSessionsClassName_constructor = function() {
                 this.callbacks = {};
                 this.pendingCallbacksUpdate = 0;
@@ -291,4 +298,4 @@
     };
     window.addEventListener("pbiEvent", eventCallback, {"capture": true});
     window.dispatchEvent(new CustomEvent("pbiInited"));
-})();
+}());

@@ -35,11 +35,13 @@ function addCallback(subsystem, action, callback)
 }
 
 function initPageScript(cb) {
-    let pageScriptInitilalized = function() {
-        window.removeEventListener("pbiInited", pageScriptInitilalized);
+    // On reloads, unload the previous page-script.
+    // The new page-script won't react to this before the "load" call.
+    executePageAction({"action": "unload"});
+    window.addEventListener("pbiInited", () => {
+        executePageAction({"action": "load"}); // Tell the script that it's now active.
         cb();
-    }
-    window.addEventListener("pbiInited", pageScriptInitilalized, {"once": true});
+    }, {"once": true});
 
     var element = document.createElement('script');
     element.src = chrome.runtime.getURL("page-script.js");
