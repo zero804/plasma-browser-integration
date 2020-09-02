@@ -1,17 +1,13 @@
 (function() {
     let purposeTransferObject = null;
     let mprisTransferObject = null;
-    let loaded = false;
     let eventCallback = function(e) {
         e.stopPropagation();
         const args = e.detail;
         console.warn("PS", e.detail);
-        if (args.action == "load") {
-            loaded = true;
-        } else if (args.action == "unload") {
+        if (args.action == "unload") {
             // TODO: Undo other operations
-            if(loaded)
-                window.removeEventListener("pbiEvent", eventCallback, {"capture": true});
+            window.removeEventListener("pbiEvent", eventCallback, {"capture": true});
         } else if (args.action == "mediaSessionsRegister") {
             MediaSessionsClassName_constructor = function() {
                 this.callbacks = {};

@@ -36,12 +36,10 @@ function addCallback(subsystem, action, callback)
 
 function initPageScript(cb) {
     // On reloads, unload the previous page-script.
-    // The new page-script won't react to this before the "load" call.
     executePageAction({"action": "unload"});
-    window.addEventListener("pbiInited", () => {
-        executePageAction({"action": "load"}); // Tell the script that it's now active.
-        cb();
-    }, {"once": true});
+
+    // The script is only run later, wait for that before sending events.
+    window.addEventListener("pbiInited", cb, {"once": true});
 
     var element = document.createElement('script');
     element.src = chrome.runtime.getURL("page-script.js");
