@@ -43,7 +43,7 @@ function initPageScript(cb) {
 
     var element = document.createElement('script');
     element.src = chrome.runtime.getURL("page-script.js");
-    (document.body || document.head || document.documentElement).appendChild(element);
+    (document.body || document.head || document.documentElement).prepend(element);
     // We need to remove the script tag after inserting or else websites relying on the order of items in
     // document.getElementsByTagName("script") will break (looking at you, Google Hangouts)
     element.parentNode.removeChild(element);
