@@ -236,7 +236,8 @@ bool Settings::setEnvironmentFromTasksModelIndex(const QModelIndex &idx)
     qApp->setDesktopFileName(service->desktopEntryName());
     qApp->setWindowIcon(QIcon::fromTheme(service->icon()));
 
-    disconnect(m_tasksModel, nullptr, this, nullptr);
+    m_tasksModel->deleteLater();
+    m_tasksModel = nullptr;
 
     return true;
 
